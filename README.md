@@ -21,7 +21,13 @@ Managed via `requirements.txt` (installed into the virtual environment below):
 | `tqdm` | Progress bar |
 | `pycryptodome` | AES-128 segment decryption |
 
-## Setup
+## Download / Installation
+
+You can download the compiled standalone desktop GUI for Windows from the **[Releases page](https://github.com/sunaram/m3u8-stream-downloader/releases)**. This executable works out of the box and requires no Python installation.
+
+If you prefer to run from source or build the executable yourself, follow the instructions below.
+
+## Running from Source
 
 ```powershell
 # 1. Clone or copy this folder, then enter it
@@ -35,6 +41,17 @@ python -m venv venv
 .\venv\Scripts\activate
 pip install -r requirements.txt
 ```
+
+### Building the Executable (Optional)
+
+If you installed Python and the requirements above, you can compile your own standalone executable using PyInstaller:
+
+```powershell
+pip install pyinstaller
+python build.py
+```
+
+The compiled standalone executable will be placed in the newly created `dist/` folder.
 
 ## Usage
 
