@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-m3u8_downloader.py — Download video/audio from an M3U8 HLS stream.
+m3u8_downloader.py - Download video/audio from an M3U8 HLS stream.
 
 Features
 --------
@@ -122,7 +122,7 @@ def fetch_bytes(session: requests.Session, url: str, retries: int = 5) -> bytes:
             if attempt == retries - 1:
                 raise RuntimeError(f"Failed to fetch segment {url}: {exc}") from exc
             wait = 2 ** attempt
-            print(f"\n  [retry {attempt + 1}/{retries - 1}] {url} — waiting {wait}s", file=sys.stderr)
+            print(f"\n  [retry {attempt + 1}/{retries - 1}] {url} - waiting {wait}s", file=sys.stderr)
             time.sleep(wait)
     return b""  # unreachable
 
@@ -187,7 +187,7 @@ def parse_master_playlist(
             i += 1
 
     if not streams:
-        # Might already be a media playlist — return as-is
+        # Might already be a media playlist - return as-is
         return base_url, False
 
     # Sort by bandwidth descending (keeps quality_index=0 meaning "best")
@@ -333,7 +333,7 @@ def download_all_segments(
             futures[future] = idx
 
         # Magic bytes that indicate the server returned an error/non-video response.
-        # GIF/JPEG/HTML are almost always auth failures. PNG is trickier —
+        # GIF/JPEG/HTML are almost always auth failures. PNG is trickier -
         # some CDNs legitimately wrap fMP4 segments in a PNG envelope.
         HARD_NON_VIDEO = {
             bytes.fromhex("47494638"): "GIF image",
@@ -384,12 +384,12 @@ def download_all_segments(
 
                         if checked_count == CHECK_FIRST_N:
                             if bad_content_count == CHECK_FIRST_N:
-                                # Definitely bad (GIF/HTML/JPEG error response) — abort
+                                # Definitely bad (GIF/HTML/JPEG error response) - abort
                                 tqdm.write(
                                     f"\n  [error] First {CHECK_FIRST_N} segments are "
                                     f"{hard_type} files (magic={magic.hex()}), not video data.\n"
                                     f"  The server is likely rejecting requests "
-                                    f"— check your --referer / headers.\n"
+                                    f"- check your --referer / headers.\n"
                                     f"  Aborting download."
                                 )
                                 if cancel_event:
@@ -399,10 +399,10 @@ def download_all_segments(
                                 pending.clear()
                                 break
                             elif png_count == CHECK_FIRST_N and not warned_png:
-                                # PNG: warn but continue — CDN may use PNG-wrapped segments
+                                # PNG: warn but continue - CDN may use PNG-wrapped segments
                                 tqdm.write(
                                     "\n  [warning] Segments appear to start with PNG magic bytes. "
-                                    "Some CDNs wrap fMP4 in a PNG envelope — continuing download.\n"
+                                    "Some CDNs wrap fMP4 in a PNG envelope - continuing download.\n"
                                     "  The merger will attempt to strip PNG headers automatically."
                                 )
                                 warned_png = True
@@ -481,7 +481,7 @@ def merge_segments_binary(
 ) -> None:
     """Binary-concatenate optional prefix bytes + segments into a single file."""
     label = "Merging"
-    print(f"[merge] Concatenating {len(segment_files)} segments → {output}")
+    print(f"[merge] Concatenating {len(segment_files)} segments -> {output}")
     with open(output, "wb") as out_f:
         if prefix_bytes:
             out_f.write(prefix_bytes)
@@ -525,11 +525,11 @@ def remux_with_ffmpeg(
     use_fmp4_path = segment_files and is_fmp4_segment(segment_files[0])
 
     if use_fmp4_path:
-        # --- fMP4 path: init_data + binary-cat → single file → ffmpeg remux ---
+        # --- fMP4 path: init_data + binary-cat -> single file -> ffmpeg remux ---
         if init_data:
-            print(f"[info] fMP4 segments + init segment ({len(init_data):,} bytes) — binary concat + remux.")
+            print(f"[info] fMP4 segments + init segment ({len(init_data):,} bytes) - binary concat + remux.")
         else:
-            print(f"[info] fMP4 segments (no init segment found) — binary concat + remux.")
+            print(f"[info] fMP4 segments (no init segment found) - binary concat + remux.")
         raw_mp4 = tmp_dir / "merged_raw.mp4"
         merge_segments_binary(segment_files, raw_mp4, prefix_bytes=init_data)
 
@@ -559,14 +559,14 @@ def remux_with_ffmpeg(
             "-f", "concat",
             "-safe", "0",
             "-i", str(concat_list),
-            # +discardcorrupt — drop corrupt packets instead of aborting.
-            # +genpts        — regenerate missing PTS from DTS.
+            # +discardcorrupt - drop corrupt packets instead of aborting.
+            # +genpts        - regenerate missing PTS from DTS.
             "-fflags", "+discardcorrupt+genpts",
             # Prevent ffmpeg from reordering packets to enforce strict
-            # interleaving — suppresses non-monotonic DTS warnings.
+            # interleaving - suppresses non-monotonic DTS warnings.
             "-max_interleave_delta", "0",
             "-c:v", "copy",
-            # Explicitly apply the ADTS→ASC bitstream filter for AAC audio.
+            # Explicitly apply the ADTS->ASC bitstream filter for AAC audio.
             # Running it explicitly (rather than letting ffmpeg apply it
             # automatically) means it runs *after* corrupt packets have been
             # discarded by -fflags +discardcorrupt, avoiding the
@@ -577,7 +577,7 @@ def remux_with_ffmpeg(
             str(output),
         ]
 
-    print(f"[ffmpeg] Merging {len(segment_files)} segments → {output} ...")
+    print(f"[ffmpeg] Merging {len(segment_files)} segments -> {output} ...")
     result = subprocess.run(cmd, capture_output=True, text=True)
 
     # Always show warnings/errors from ffmpeg stderr (last 20 lines)
@@ -595,7 +595,7 @@ def remux_with_ffmpeg(
     if output.exists() and output.stat().st_size > 0:
         print(
             f"[ffmpeg] Exited with code {result.returncode} but output file was "
-            f"created ({output.stat().st_size:,} bytes) — treating as success.",
+            f"created ({output.stat().st_size:,} bytes) - treating as success.",
             file=sys.stderr,
         )
         return True
@@ -703,8 +703,20 @@ def detect_video_encoder(ffmpeg: str) -> tuple[str, str, list[str]]:
     Probe available ffmpeg encoders and return the best one.
 
     Returns (encoder_name, label, extra_flags).
-    Tries GPU encoders first (NVENC → AMF → QSV), falls back to libx264.
+    Checks M3U8_ENCODER_OVERRIDE env var first (set by the GUI), then
+    tries GPU encoders (NVENC -> AMF -> QSV), falls back to libx264.
     """
+    # GUI / env-var override: skip auto-detection and use the specified encoder
+    override = os.environ.get("M3U8_ENCODER_OVERRIDE", "").strip()
+    if override:
+        for enc_name, label, flags in _GPU_ENCODERS:
+            if enc_name == override:
+                print(f"[scale] Encoder override: {label} ({enc_name})")
+                return enc_name, label, flags
+        if override == "libx264":
+            print(f"[scale] Encoder override: CPU (libx264)")
+            return _CPU_ENCODER
+
     try:
         result = subprocess.run(
             [ffmpeg, "-hide_banner", "-encoders"],
@@ -735,7 +747,7 @@ def scale_video(src: Path, dst: Path, target_height: int, source_height: int = 0
     """
     Re-encode *src* to *dst* scaling video to *target_height* pixels tall.
 
-    - Auto-detects GPU encoder (NVENC → AMF → QSV → libx264 CPU fallback).
+    - Auto-detects GPU encoder (NVENC -> AMF -> QSV -> libx264 CPU fallback).
     - Caps the output bitrate so the scaled file is always smaller than the source.
     - Shows a live tqdm progress bar based on ffmpeg's progress output.
     - Audio is re-encoded to AAC 192 kbps.
@@ -761,7 +773,7 @@ def scale_video(src: Path, dst: Path, target_height: int, source_height: int = 0
         maxrate_kbps = int(target_kbps * 1.1)           # allow 10% burst
         bufsize_kbps = target_kbps * 2
         print(
-            f"[scale] Source bitrate: {src_bps // 1000:,} kbps  →  "
+            f"[scale] Source bitrate: {src_bps // 1000:,} kbps  ->  "
             f"target: {target_kbps:,} kbps  (max: {maxrate_kbps:,} kbps)"
         )
         bitrate_flags = [
@@ -770,7 +782,7 @@ def scale_video(src: Path, dst: Path, target_height: int, source_height: int = 0
             "-bufsize", f"{bufsize_kbps}k",
         ]
     else:
-        # Fallback: no bitrate info — use conservative quality setting
+        # Fallback: no bitrate info - use conservative quality setting
         if enc_name == "libx264":
             bitrate_flags = ["-crf", "23"]
         else:
@@ -793,7 +805,10 @@ def scale_video(src: Path, dst: Path, target_height: int, source_height: int = 0
         str(dst),
     ]
 
-    print(f"[scale] Re-encoding {src.name} → {target_height}p → {dst.name} …")
+    print(f"[scale] Re-encoding {src.name} -> {target_height}p -> {dst.name} ...")
+    # Sentinel for GUI: total duration so the progress bar knows its upper bound
+    if duration > 0:
+        print(f"[scale_total_s={duration:.3f}]", flush=True)
 
     bar_fmt = "{l_bar}{bar}| {n:.1f}/{total:.1f}s [{elapsed}<{remaining}, {rate_fmt}]"
     total = duration if duration > 0 else None
@@ -808,6 +823,7 @@ def scale_video(src: Path, dst: Path, target_height: int, source_height: int = 0
 
     returncode = 0
     stderr_lines: list[str] = []
+    _last_emitted_pct = -1
 
     with tqdm(
         total=total,
@@ -823,16 +839,23 @@ def scale_video(src: Path, dst: Path, target_height: int, source_height: int = 0
             if line.startswith("out_time_ms="):
                 try:
                     ms = int(line.split("=", 1)[1])
-                    current = ms / 1_000_000.0   # microseconds → seconds
+                    current = ms / 1_000_000.0   # microseconds -> seconds
                     delta = current - last_time
                     if delta > 0:
                         pbar.update(delta)
                         last_time = current
+                        # Emit a machine-readable percentage for the GUI
+                        if total and total > 0:
+                            pct = min(100, int(last_time / total * 100))
+                            if pct != _last_emitted_pct:
+                                print(f"[scale_progress={pct}]", flush=True)
+                                _last_emitted_pct = pct
                 except ValueError:
                     pass
             elif line == "progress=end":
                 if total and last_time < total:
                     pbar.update(total - last_time)
+                print("[scale_progress=100]", flush=True)
 
         # Drain stderr for error reporting
         for line in proc.stderr:  # type: ignore[union-attr]
@@ -849,7 +872,7 @@ def scale_video(src: Path, dst: Path, target_height: int, source_height: int = 0
     if dst.exists() and dst.stat().st_size > 0:
         print(
             f"[scale] ffmpeg exited with code {returncode} but output "
-            f"exists ({dst.stat().st_size:,} bytes) — treating as success.",
+            f"exists ({dst.stat().st_size:,} bytes) - treating as success.",
             file=sys.stderr,
         )
         return True
@@ -890,7 +913,7 @@ def run(args: argparse.Namespace) -> None:
     print(f"[fetch] {args.url}")
     playlist_text = fetch_text(session, args.url)
 
-    # Resolve master → media playlist
+    # Resolve master -> media playlist
     stream_url = args.url
     is_audio = False
     if is_master_playlist(playlist_text):
@@ -923,25 +946,26 @@ def run(args: argparse.Namespace) -> None:
     if output.suffix.lower() not in (".mp4", ".ts", ".m4a", ".mkv", ".aac"):
         output = output.with_suffix(".m4a" if (args.audio_only or is_audio) else ".mp4")
 
-    # Create temp directory inside the current working directory
-    tmp_dir = Path.cwd() / "temp" / f"m3u8_dl_{uuid.uuid4().hex[:8]}"
+    # Create temp directory (user-configurable via --temp-dir, else cwd/temp)
+    _temp_base = Path(args.temp_dir) if getattr(args, "temp_dir", None) else Path.cwd() / "temp"
+    tmp_dir = _temp_base / f"m3u8_dl_{uuid.uuid4().hex[:8]}"
     tmp_dir.mkdir(parents=True, exist_ok=True)
     print(f"[tmp] {tmp_dir}")
 
     cancel_event = threading.Event()
 
     def _confirm_cancel():
-        """Called on the first Ctrl+C — ask the user what to do."""
+        """Called on the first Ctrl+C - ask the user what to do."""
         print("\n", flush=True)
         try:
             answer = input("[interrupt] Cancel download? [y/N] ").strip().lower()
         except (EOFError, KeyboardInterrupt):
-            # Second Ctrl+C during the prompt → force quit immediately
+            # Second Ctrl+C during the prompt -> force quit immediately
             print("\n[cancelled] Force-quitting.", file=sys.stderr)
             cancel_event.set()
             return
         if answer in ("y", "yes"):
-            print("[cancelled] Stopping after in-flight segments finish…", file=sys.stderr)
+            print("[cancelled] Stopping after in-flight segments finish...", file=sys.stderr)
             cancel_event.set()
         else:
             print("[resuming] Continuing download.", flush=True)
@@ -982,7 +1006,7 @@ def run(args: argparse.Namespace) -> None:
             except KeyboardInterrupt:
                 _confirm_cancel()
                 if cancel_event.is_set():
-                    # os._exit() kills the process immediately — daemon threads
+                    # os._exit() kills the process immediately - daemon threads
                     # die with it and tqdm stops printing instantly.
                     # Do temp-dir cleanup manually first.
                     if not args.keep_temp:
@@ -1004,7 +1028,7 @@ def run(args: argparse.Namespace) -> None:
 
         # Strip PNG wrappers in-place if the CDN used PNG-wrapped segments
         if detect_png_wrapped(segment_files):
-            print("[info] PNG-wrapped segments detected — stripping PNG envelopes…")
+            print("[info] PNG-wrapped segments detected - stripping PNG envelopes...")
             stripped = 0
             for seg_path in segment_files:
                 raw = seg_path.read_bytes()
@@ -1015,14 +1039,14 @@ def run(args: argparse.Namespace) -> None:
             print(f"[info] Stripped PNG wrapper from {stripped}/{len(segment_files)} segments.")
 
         if args.no_ffmpeg:
-            # Binary concatenation → raw file
+            # Binary concatenation -> raw file
             raw_out = tmp_dir / "merged.ts"
             merge_segments_binary(segment_files, raw_out, prefix_bytes=init_data)
             final_out = output.with_suffix(".ts" if not init_data else ".mp4")
             shutil.copy2(raw_out, final_out)
-            print(f"\n[done] Saved raw file → {final_out.resolve()}")
+            print(f"\n[done] Saved raw file -> {final_out.resolve()}")
         else:
-            # Use ffmpeg — handles both MPEG-TS and fMP4
+            # Use ffmpeg - handles both MPEG-TS and fMP4
             success = remux_with_ffmpeg(segment_files, tmp_dir, output, init_data=init_data)
             if not success:
                 sys.exit(
@@ -1036,18 +1060,18 @@ def run(args: argparse.Namespace) -> None:
                 original_height = get_video_height(output)
                 if original_height <= 0:
                     print(
-                        "[scale] Could not determine video height — skipping resize.",
+                        "[scale] Could not determine video height - skipping resize.",
                         file=sys.stderr,
                     )
-                    print(f"\n[done] → {output.resolve()}")
+                    print(f"\n[done] -> {output.resolve()}")
                 elif original_height <= target_scale:
                     print(
                         f"[scale] Source is already {original_height}p "
-                        f"(≤ {target_scale}p requested) — no resize needed."
+                        f"(≤ {target_scale}p requested) - no resize needed."
                     )
-                    print(f"\n[done] → {output.resolve()}")
+                    print(f"\n[done] -> {output.resolve()}")
                 else:
-                    # Rename merged file → "<stem> - original<suffix>"
+                    # Rename merged file -> "<stem> - original<suffix>"
                     original_copy = output.with_stem(output.stem + " - original")
                     output.rename(original_copy)
                     print(
@@ -1056,13 +1080,13 @@ def run(args: argparse.Namespace) -> None:
                     )
                     scaled_ok = scale_video(original_copy, output, target_scale, source_height=original_height)
                     if scaled_ok:
-                        print(f"\n[done] → {output.resolve()} ({target_scale}p)")
+                        print(f"\n[done] -> {output.resolve()} ({target_scale}p)")
                     else:
                         # Restore original filename so the user doesn't lose their file
                         original_copy.rename(output)
-                        sys.exit("[error] Scaling failed — original file restored.")
+                        sys.exit("[error] Scaling failed - original file restored.")
             else:
-                print(f"\n[done] → {output.resolve()}")
+                print(f"\n[done] -> {output.resolve()}")
 
     except KeyboardInterrupt:
         _confirm_cancel()
@@ -1147,6 +1171,12 @@ def parse_args() -> argparse.Namespace:
             "(e.g. 720 for 720p). The original is kept with a \"-original\" suffix. "
             "Has no effect if the source is already at or below the target height."
         ),
+    )
+    parser.add_argument(
+        "--temp-dir",
+        default="",
+        metavar="DIR",
+        help="Directory to use as the parent for temporary segment folders (default: <cwd>/temp)",
     )
     parser.add_argument(
         "--no-ffmpeg",

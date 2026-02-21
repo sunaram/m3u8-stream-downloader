@@ -42,7 +42,16 @@ pip install -r requirements.txt
 python m3u8_downloader.py <M3U8_URL> [OPTIONS]
 ```
 
-### Options
+### Desktop GUI
+
+A cross-platform PyQt6 GUI wrapper is included for easier use without the command line.
+
+`python m3u8_gui.py`
+
+- **Download Directory**: Defaults to the locally created `downloads` directory if left blank.
+- **Auto-naming**: If no output filename is provided, the GUI will automatically save it as `output.mp4` (or `output.ts` if No ffmpeg is checked). If the file already exists, it will auto-append a number (e.g. `output-1.mp4`).
+
+### CLI Options
 
 | Flag | Default | Description |
 |---|---|---|
