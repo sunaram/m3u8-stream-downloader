@@ -718,8 +718,12 @@ class MainWindow(QMainWindow):
             output = str(out_path)
             self._output_edit.setText(output)
 
-        cmd = [
-            sys.executable, "-u", str(DOWNLOADER),
+        if getattr(sys, 'frozen', False):
+            cmd = [sys.executable, "--run-downloader"]
+        else:
+            cmd = [sys.executable, "-u", str(DOWNLOADER)]
+            
+        cmd += [
             url,
             "-o", output,
             "-w", str(self._workers_spin.value()),
@@ -831,10 +835,20 @@ def main() -> None:
     app.setOrganizationName(APP_ORG)
     app.setStyleSheet(STYLESHEET)
 
-    win = MainWindow()
-    win.show()
+    window = MainWindow()
+    window.show()
     sys.exit(app.exec())
 
 
 if __name__ == "__main__":
+    # If packaged via PyInstaller, intercept the hidden flag to run as the downloader
+    if "--run-downloader" in sys.argv:
+        sys.argv.remove("--run-downloader")
+        # Force unbuffered output so the GUI can read progress in real-time
+        sys.stdout.reconfigure(line_buffering=True)
+        sys.stderr.reconfigure(line_buffering=True)
+        import m3u8_downloader
+        m3u8_downloader.run(m3u8_downloader.parse_args())
+        sys.exit(0)
+
     main()

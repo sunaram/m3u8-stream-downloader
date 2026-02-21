@@ -1,5 +1,9 @@
 temp
-download
+downloads
 __pycache__
 venv
 .agent
+build
+dist
+*.spec
+
