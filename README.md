@@ -53,6 +53,18 @@ python build.py
 
 The compiled standalone executable will be placed in the newly created `dist/` folder.
 
+## How to find the M3U8 URL
+
+If you have a webpage with a playing video but don't know the M3U8 URL, you can usually find it using your browser's Developer Tools:
+
+1. Open the webpage with the video you want to download.
+2. Open **Developer Tools** (Press `F12` or `Ctrl+Shift+I` / `Cmd+Opt+I`).
+3. Click on the **Network** tab.
+4. In the "Filter" box, type `m3u8`.
+5. Start playing the video.
+6. A request ending in `.m3u8` (often `master.m3u8` or `index.m3u8`) should appear in the list. Right-click it and select **Copy > Copy link address**.
+7. Paste this URL into the downloader.
+
 ## Usage
 
 ```
