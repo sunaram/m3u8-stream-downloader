@@ -1067,7 +1067,7 @@ def run(args: argparse.Namespace) -> None:
                 elif original_height <= target_scale:
                     print(
                         f"[scale] Source is already {original_height}p "
-                        f"(≤ {target_scale}p requested) - no resize needed."
+                        f"(<= {target_scale}p requested) - no resize needed."
                     )
                     print(f"\n[done] -> {output.resolve()}")
                 else:
