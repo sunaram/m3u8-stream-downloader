@@ -91,39 +91,42 @@ def resolve_url(base: str, href: str) -> str:
     return urllib.parse.urljoin(base, href)
 
 
-def make_session(headers: dict[str, str]) -> requests.Session:
-    session = requests.Session()
+from curl_cffi import requests as curl_requests
+
+def make_session(headers: dict[str, str]) -> curl_requests.Session:
+    # Use impersonate="chrome" to bypass TLS fingerprinting blocks
+    session = curl_requests.Session(impersonate="chrome")
     session.headers.update(headers)
     return session
 
 
-def fetch_text(session: requests.Session, url: str, retries: int = 3) -> str:
+def fetch_text(session: curl_requests.Session, url: str, retries: int = 3) -> str:
     """GET *url* and return body as text, with retries."""
     for attempt in range(retries):
         try:
             resp = session.get(url, timeout=30)
             resp.raise_for_status()
             return resp.text
-        except requests.RequestException as exc:
+        except Exception as exc:
             if attempt == retries - 1:
                 raise RuntimeError(f"Failed to fetch {url}: {exc}") from exc
             time.sleep(2 ** attempt)
     return ""  # unreachable
 
 
-def fetch_bytes(session: requests.Session, url: str, retries: int = 5) -> bytes:
+def fetch_bytes(session: curl_requests.Session, url: str, retries: int = 5) -> bytes:
     """GET *url* and return raw bytes, with exponential back-off retries."""
     for attempt in range(retries):
         try:
             resp = session.get(url, timeout=60)
             resp.raise_for_status()
             return resp.content
-        except requests.RequestException as exc:
+        except Exception as exc:
             if attempt == retries - 1:
                 raise RuntimeError(f"Failed to fetch segment {url}: {exc}") from exc
-            wait = 2 ** attempt
-            print(f"\n  [retry {attempt + 1}/{retries - 1}] {url} - waiting {wait}s", file=sys.stderr)
-            time.sleep(wait)
+            wait_time = 2 ** attempt
+            print(f"\n  [retry {attempt + 1}/{retries - 1}] {url} - waiting {wait_time}s", file=sys.stderr)
+            time.sleep(wait_time)
     return b""  # unreachable
 
 # ---------------------------------------------------------------------------
@@ -288,7 +291,7 @@ def decrypt_segment(data: bytes, key: bytes, iv: Optional[bytes], segment_index:
 # ---------------------------------------------------------------------------
 
 def download_segment(
-    session: requests.Session,
+    session: curl_requests.Session,
     url: str,
     dest: Path,
     index: int,
@@ -304,7 +307,7 @@ def download_segment(
 
 
 def download_all_segments(
-    session: requests.Session,
+    session: curl_requests.Session,
     segments: list[str],
     encryption: Optional[dict],
     tmp_dir: Path,
@@ -1098,7 +1101,7 @@ def run(args: argparse.Namespace) -> None:
             print(f"[tmp] Kept temp dir: {tmp_dir}")
         else:
             shutil.rmtree(tmp_dir, ignore_errors=True)
-
+        session.close()
 
 # ---------------------------------------------------------------------------
 # CLI

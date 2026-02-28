@@ -484,11 +484,7 @@ class MainWindow(QMainWindow):
         out_hlay = QHBoxLayout(out_group)
         self._output_edit = QLineEdit()
         self._output_edit.setPlaceholderText("output.mp4")
-        btn_out = QPushButton("Browse...")
-        btn_out.setFixedWidth(80)
-        btn_out.clicked.connect(self._browse_output)
         out_hlay.addWidget(self._output_edit)
-        out_hlay.addWidget(btn_out)
         vlay.addWidget(out_group)
 
         # ── Download Options (collapsible) ───────────────────────────────
@@ -607,22 +603,6 @@ class MainWindow(QMainWindow):
 
         vlay.addStretch()
 
-    # ---------------------------------------------------------------- browse --
-
-    def _browse_output(self) -> None:
-        dl_dir = self._dl_dir_edit.text().strip()
-        if not dl_dir:
-            dl_dir = str(SCRIPT_DIR / "downloads")
-        
-        ext = ".ts" if self._no_ffmpeg_chk.isChecked() else ".mp4"
-        default_name = str(Path(dl_dir) / f"output{ext}")
-        path, _ = QFileDialog.getSaveFileName(
-            self, "Save output as...", default_name,
-            "MP4 Files (*.mp4);;MKV Files (*.mkv);;TS Files (*.ts);;All Files (*)",
-        )
-        if path:
-            self._output_edit.setText(path)
-
     # ----------------------------------------------------------- GPU detect --
 
     def _detect_gpu(self) -> None:
@@ -700,13 +680,14 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Missing URL", "Please enter an M3U8 stream URL.")
             return None
 
-        output = self._output_edit.text().strip()
-        if not output:
-            dl_dir = self._dl_dir_edit.text().strip()
-            if not dl_dir:
-                dl_dir = str(SCRIPT_DIR / "downloads")
-                
-            ext = ".ts" if self._no_ffmpeg_chk.isChecked() else ".mp4"
+        dl_dir = self._dl_dir_edit.text().strip()
+        if not dl_dir:
+            dl_dir = str(SCRIPT_DIR / "downloads")
+            
+        ext = ".ts" if self._no_ffmpeg_chk.isChecked() else ".mp4"
+
+        output_name = self._output_edit.text().strip()
+        if not output_name:
             base_name = "output"
             out_path = Path(dl_dir) / f"{base_name}{ext}"
             
@@ -715,8 +696,11 @@ class MainWindow(QMainWindow):
                 out_path = Path(dl_dir) / f"{base_name}-{counter}{ext}"
                 counter += 1
                 
+            self._output_edit.setText(out_path.name)
             output = str(out_path)
-            self._output_edit.setText(output)
+        else:
+            out_path = Path(dl_dir) / output_name
+            output = str(out_path)
 
         if getattr(sys, 'frozen', False):
             cmd = [sys.executable, "--run-downloader"]
