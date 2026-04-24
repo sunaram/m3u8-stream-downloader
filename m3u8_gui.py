@@ -516,6 +516,10 @@ class MainWindow(QMainWindow):
         self._referer_edit.setPlaceholderText("Auto-derived from URL")
         _form_row(dl_lay, "Referer:", self._referer_edit)
 
+        self._origin_edit = QLineEdit()
+        self._origin_edit.setPlaceholderText("Auto-derived from Referer")
+        _form_row(dl_lay, "Origin:", self._origin_edit)
+
         # Checkboxes - indented to align with inputs
         chk_container = QWidget()
         chk_container.setMinimumHeight(44)
@@ -648,6 +652,8 @@ class MainWindow(QMainWindow):
         self._ffmpeg_edit.setText(s.value("ffmpeg_dir", ""))
         self._dl_dir_edit.setText(s.value("download_dir", ""))
         self._temp_dir_edit.setText(s.value("temp_dir", ""))
+        self._referer_edit.setText(s.value("referer", ""))
+        self._origin_edit.setText(s.value("origin", ""))
         self._workers_spin.setValue(int(s.value("workers", 4)))
         self._scale_spin.setValue(int(s.value("scale", 0)))
         gpu_val = s.value("gpu_encoder", "auto")
@@ -663,6 +669,8 @@ class MainWindow(QMainWindow):
         s.setValue("ffmpeg_dir",    self._ffmpeg_edit.text().strip())
         s.setValue("download_dir",  self._dl_dir_edit.text().strip())
         s.setValue("temp_dir",      self._temp_dir_edit.text().strip())
+        s.setValue("referer",       self._referer_edit.text().strip())
+        s.setValue("origin",        self._origin_edit.text().strip())
         s.setValue("workers",       self._workers_spin.value())
         s.setValue("scale",         self._scale_spin.value())
         s.setValue("gpu_encoder",   self._gpu_combo.currentData())
@@ -718,6 +726,8 @@ class MainWindow(QMainWindow):
             cmd += ["-s", str(self._scale_spin.value())]
         if self._referer_edit.text().strip():
             cmd += ["--referer", self._referer_edit.text().strip()]
+        if self._origin_edit.text().strip():
+            cmd += ["--origin", self._origin_edit.text().strip()]
         if self._audio_chk.isChecked():
             cmd.append("--audio-only")
         if self._no_ffmpeg_chk.isChecked():

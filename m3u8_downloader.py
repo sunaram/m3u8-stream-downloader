@@ -86,9 +86,42 @@ def derive_referer(url: str) -> str:
     return f"{parsed.scheme}://{parsed.netloc}/"
 
 
+def derive_origin(url: str) -> str:
+    """Return scheme + host of *url* as an Origin value (no trailing slash)."""
+    parsed = urllib.parse.urlparse(url)
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
 def resolve_url(base: str, href: str) -> str:
     """Resolve *href* relative to *base*."""
     return urllib.parse.urljoin(base, href)
+
+
+def sanitize_filename(name: str) -> str:
+    """
+    Remove or replace characters that are invalid or problematic in filenames.
+    Stricter version to handle long names and Explorer-breaking characters.
+    """
+    # 1. Replace illegal characters with an underscore
+    # Illegal in Windows: < > : " / \ | ? *
+    cleaned = re.sub(r'[<>:"/\\|?*]', "_", name)
+    
+    # 2. Remove control characters and non-printable characters
+    cleaned = "".join(ch for ch in cleaned if ch.isprintable())
+    
+    # 3. Collapse multiple underscores and spaces
+    cleaned = re.sub(r'_+', "_", cleaned)
+    cleaned = re.sub(r'\s+', " ", cleaned)
+    
+    # 4. Strip leading/trailing dots and spaces (Explorer often fails to locate these)
+    cleaned = cleaned.strip(" ._")
+    
+    # 5. Enforce a length limit to avoid "Path too long" errors (MAX_PATH is 260)
+    # 150 is a safe limit for the filename part.
+    if len(cleaned) > 150:
+        cleaned = cleaned[:150].rstrip(" ._")
+        
+    return cleaned or "output"
 
 
 from curl_cffi import requests as curl_requests
@@ -119,13 +152,24 @@ def fetch_bytes(session: curl_requests.Session, url: str, retries: int = 5) -> b
     for attempt in range(retries):
         try:
             resp = session.get(url, timeout=60)
+            
+            # Treat 304 (Not Modified) or 204 (No Content) as an error for segments,
+            # because we need the actual data to merge.
+            if resp.status_code in (304, 204):
+                raise RuntimeError(f"Server returned {resp.status_code} (No data).")
+                
             resp.raise_for_status()
+            
+            if not resp.content:
+                # Some CDNs return 200 OK with empty body on expired signatures
+                raise RuntimeError("Response body is empty.")
+                
             return resp.content
         except Exception as exc:
             if attempt == retries - 1:
                 raise RuntimeError(f"Failed to fetch segment {url}: {exc}") from exc
             wait_time = 2 ** attempt
-            print(f"\n  [retry {attempt + 1}/{retries - 1}] {url} - waiting {wait_time}s", file=sys.stderr)
+            print(f"\n  [retry {attempt + 1}/{retries - 1}] {url} - {exc} - waiting {wait_time}s", file=sys.stderr)
             time.sleep(wait_time)
     return b""  # unreachable
 
@@ -888,10 +932,19 @@ def scale_video(src: Path, dst: Path, target_height: int, source_height: int = 0
 
 def build_headers(args: argparse.Namespace) -> dict[str, str]:
     headers = dict(DEFAULT_HEADERS)
-    # Auto-derive Referer
+
+    # 1. Auto-derive or use provided Referer
     referer = args.referer if args.referer else derive_referer(args.url)
     headers["Referer"] = referer
-    # Apply extra headers from --header flags
+
+    # 2. Auto-derive or use provided Origin
+    # If explicitly provided via --origin, use it.
+    # Otherwise, derive from the Referer (which mimics browser behavior for CORS).
+    origin = args.origin if getattr(args, "origin", None) else derive_origin(referer)
+    if origin:
+        headers["Origin"] = origin
+
+    # 3. Apply extra headers from --header flags (can override Origin/Referer)
     for raw in args.header:
         if ":" in raw:
             name, _, value = raw.partition(":")
@@ -924,8 +977,10 @@ def run(args: argparse.Namespace) -> None:
             playlist_text, args.url, args.audio_only, args.quality,
             resolution=args.resolution,
         )
-        # Update Referer for the stream domain if it differs
-        session.headers["Referer"] = derive_referer(stream_url)
+        # Update Referer only if the user didn't provide one
+        if not args.referer:
+            session.headers["Referer"] = derive_referer(stream_url)
+            session.headers["Origin"] = derive_origin(session.headers["Referer"])
         print(f"[fetch] {stream_url}")
         playlist_text = fetch_text(session, stream_url)
     elif args.audio_only:
@@ -945,9 +1000,15 @@ def run(args: argparse.Namespace) -> None:
         sys.exit(f"[error] Unsupported encryption method: {encryption['method']}")
 
     # Determine output path
-    output = Path(args.output)
-    if output.suffix.lower() not in (".mp4", ".ts", ".m4a", ".mkv", ".aac"):
-        output = output.with_suffix(".m4a" if (args.audio_only or is_audio) else ".mp4")
+    unclean_output = Path(args.output)
+    output_dir = unclean_output.parent
+    output_name = sanitize_filename(unclean_output.stem)
+    output_ext = unclean_output.suffix
+
+    if output_ext.lower() not in (".mp4", ".ts", ".m4a", ".mkv", ".aac"):
+        output_ext = ".m4a" if (args.audio_only or is_audio) else ".mp4"
+
+    output = output_dir / f"{output_name}{output_ext}"
 
     # Create temp directory (user-configurable via --temp-dir, else cwd/temp)
     _temp_base = Path(args.temp_dir) if getattr(args, "temp_dir", None) else Path.cwd() / "temp"
@@ -1126,6 +1187,12 @@ def parse_args() -> argparse.Namespace:
         default="",
         metavar="URL",
         help="Override the Referer header (default: derived from M3U8 URL)",
+    )
+    parser.add_argument(
+        "--origin",
+        default="",
+        metavar="URL",
+        help="Override the Origin header (default: derived from Referer)",
     )
     parser.add_argument(
         "-H", "--header",

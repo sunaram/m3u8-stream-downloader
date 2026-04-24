@@ -11,7 +11,7 @@ def build():
     # We build the GUI script. It already includes the downloader script
     # because we import m3u8_downloader in the --run-downloader branch.
     cmd = [
-        "pyinstaller",
+        sys.executable, "-m", "PyInstaller",
         "--noconfirm",
         "--clean",
         "--windowed", # Don't show the console window
